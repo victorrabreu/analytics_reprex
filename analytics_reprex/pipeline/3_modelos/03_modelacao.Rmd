@@ -1,0 +1,488 @@
+---
+title: "Modelação"
+author: "Victor Abreu"
+date: "2022-12-12"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE, cache = FALSE}
+
+library("knitr") # necessário carregar este pacote
+# install.packages("here")
+library("here") # necessário carregar este pacote
+# here()
+
+knitr::opts_chunk$set(echo = TRUE) # apresentar trechos de código no relatório final: sim ou não?
+opts_knit$set(root.dir = here()) # define como working directory o diretório do projeto (pois este ficheiro .Rmd está em "./pipeline/2_aed")
+opts_chunk$set(root.dir = here()) # define como working directory o diretório do projeto (pois este ficheiro .Rmd está em "./pipeline/2_aed")
+
+```
+
+
+
+# Introdução
+
+
+> Esta análise foi realizada no âmbito de ...
+
+
+Primeiro, comecemos por verificar se estamos a iniciar o nosso trabalho no diretório correcto:
+
+
+```{r}
+
+getwd()
+
+```
+
+
+Este aspeto é crucial, até para garantir a correta reproducibilidade deste nosso projeto.
+
+Importemos ainda as bibliotecas necessárias (não sem antes verificar se as mesmas estão instaladas), bem como o nosso *script* orientado para a **modelação** estatística:
+
+
+```{r}
+
+# Nomes dos packages
+
+packages <- c("class", "nnet", "rpart", "rpart.plot", "e1071")
+
+# Instalação de packages (apenas se necessário!)
+
+installed_packages <- packages %in% rownames(installed.packages())
+
+if (any(installed_packages == FALSE)) {
+
+    install.packages(packages[!installed_packages])
+
+}
+
+# Carregamento de packages
+
+invisible(lapply(packages, library, character.only = TRUE))
+
+```
+
+
+```{r}
+
+source("./misc/scripts/mod.R", encoding = 'UTF-8')
+
+```
+
+
+
+# Importação de dados
+
+
+
+Efetuemos a importação dos dados exportados no pré-processamento, através do comando `read.csv`, com posterior confirmação (e ajustando a natureza dos dados em cada coluna):
+
+
+```{r}
+
+iris.treino <- read.csv2("./pipeline/3_modelos/iris_treino.csv", sep = ",")
+iris.val <- read.csv2("./pipeline/3_modelos/iris_val.csv", sep = ",")
+iris.teste <- read.csv2("./pipeline/3_modelos/iris_teste.csv", sep = ",")
+
+```
+
+
+```{r}
+
+iris.treino$sepal.length <- as.numeric(iris.treino$sepal.length)
+iris.treino$sepal.width <- as.numeric(iris.treino$sepal.width)
+iris.treino$petal.length <- as.numeric(iris.treino$petal.length)
+iris.treino$petal.width <- as.numeric(iris.treino$petal.width)
+
+iris.treino$sepal.length.norm <- as.numeric(iris.treino$sepal.length.norm)
+iris.treino$sepal.width.norm <- as.numeric(iris.treino$sepal.width.norm)
+iris.treino$petal.length.norm <- as.numeric(iris.treino$petal.length.norm)
+iris.treino$petal.width.norm <- as.numeric(iris.treino$petal.width.norm)
+
+```
+
+
+```{r}
+
+iris.val$sepal.length <- as.numeric(iris.val$sepal.length)
+iris.val$sepal.width <- as.numeric(iris.val$sepal.width)
+iris.val$petal.length <- as.numeric(iris.val$petal.length)
+iris.val$petal.width <- as.numeric(iris.val$petal.width)
+
+iris.val$sepal.length.norm <- as.numeric(iris.val$sepal.length.norm)
+iris.val$sepal.width.norm <- as.numeric(iris.val$sepal.width.norm)
+iris.val$petal.length.norm <- as.numeric(iris.val$petal.length.norm)
+iris.val$petal.width.norm <- as.numeric(iris.val$petal.width.norm)
+
+```
+
+
+```{r}
+
+iris.teste$sepal.length <- as.numeric(iris.teste$sepal.length)
+iris.teste$sepal.width <- as.numeric(iris.teste$sepal.width)
+iris.teste$petal.length <- as.numeric(iris.teste$petal.length)
+iris.teste$petal.width <- as.numeric(iris.teste$petal.width)
+
+iris.teste$sepal.length.norm <- as.numeric(iris.teste$sepal.length.norm)
+iris.teste$sepal.width.norm <- as.numeric(iris.teste$sepal.width.norm)
+iris.teste$petal.length.norm <- as.numeric(iris.teste$petal.length.norm)
+iris.teste$petal.width.norm <- as.numeric(iris.teste$petal.width.norm)
+
+```
+
+
+
+# Ajustamento de modelos no conjunto de treino
+
+
+
+Nesta fase, iremos construir modelos que nos permitam prever a espécie das flores com base nas medições já consideradas - largura das sépalas e comprimento das pétalas.
+
+Este será, portanto, um problema de classificação com várias categorias (*multiclass classification*) e, nesse sentido, iremos admitir a existência de cinco tipos de modelos, a saber:
+
+
+1. **Regressão logística** (enquanto caso particular de rede neural, numa variante simples - dados os resultados que veremos de seguida, não se justifica o recurso a redes mais complexas);
+2. $k$-**vizinhos mais próximos**;
+3. **Árvores de decisão**;
+4. ***Naive Bayes***;
+5. **Máquinas de vetores de suporte**.
+
+Seguindo a ordem especificada, comecemos pela regressão logística, apresentando após o ajustamento do modelo a matriz de confusão que lhe está associada:
+
+
+```{r include=FALSE}
+
+reg.log <- multinom(class ~ sepal.width + petal.length, data = iris.treino)
+
+```
+
+
+```{r}
+
+obs <- iris.treino$class
+pred <- predict(reg.log, iris.treino)
+
+conf.mat <- table(obs, pred)
+conf.mat
+
+```
+
+
+Os resultados obtidos, ainda que apenas num ambiente de treino (para já), são bastante encorajadores. Contudo, como este problema de classificação não possui natureza binária, o cálculo de métricas como a *accuracy*, a *precision* e a *recall* não é tão imediato. Por isso, serão calculadas de seguida estes valores para cada classe/espécie, apenas para este modelo (sem perda de generalidade, no entanto):
+
+
+```{r}
+
+obs.setosa <- ifelse(iris.treino$class == "setosa", "setosa", "other")
+pred.setosa <- ifelse(predict(reg.log, iris.treino) == "setosa", "setosa", "other")
+
+conf.mat.setosa <- table(obs.setosa, pred.setosa)
+accuracy.setosa <- sum(diag(conf.mat.setosa))/sum(conf.mat.setosa)
+precision.setosa <- sum(pred.setosa == "setosa" & obs.setosa == "setosa")/sum(pred.setosa == "setosa") # das que previ, quantas acertei?
+recall.setosa <- sum(pred.setosa == "setosa" & obs.setosa == "setosa")/sum(obs.setosa == "setosa") # das que eram certas, quantas previ?
+
+```
+
+
+```{r}
+
+obs.versicolor <- ifelse(iris.treino$class == "versicolor", "versicolor", "other")
+pred.versicolor <- ifelse(predict(reg.log, iris.treino) == "versicolor", "versicolor", "other")
+
+conf.mat.versicolor <- table(obs.versicolor, pred.versicolor)
+accuracy.versicolor <- sum(diag(conf.mat.versicolor))/sum(conf.mat.versicolor)
+precision.versicolor <- sum(pred.versicolor == "versicolor" & obs.versicolor == "versicolor")/sum(pred.versicolor == "versicolor") # das que previ, quantas acertei?
+recall.versicolor <- sum(pred.versicolor == "versicolor" & obs.versicolor == "versicolor")/sum(obs.versicolor == "versicolor") # das que eram certas, quantas previ?
+
+```
+
+
+```{r}
+
+obs.virginica <- ifelse(iris.treino$class == "virginica", "virginica", "other")
+pred.virginica <- ifelse(predict(reg.log, iris.treino) == "virginica", "virginica", "other")
+
+conf.mat.virginica <- table(obs.virginica, pred.virginica)
+accuracy.virginica <- sum(diag(conf.mat.virginica))/sum(conf.mat.virginica)
+precision.virginica <- sum(pred.virginica == "virginica" & obs.virginica == "virginica")/sum(pred.virginica == "virginica") # das que previ, quantas acertei?
+recall.virginica <- sum(pred.virginica == "virginica" & obs.virginica == "virginica")/sum(obs.virginica == "virginica") # das que eram certas, quantas previ?
+
+```
+
+
+```{r}
+
+result <- data.frame(accuracy = c(accuracy.setosa, accuracy.versicolor, accuracy.virginica), precision = c(precision.setosa, precision.versicolor, precision.virginica), recall = c(recall.setosa, recall.versicolor, recall.virginica), row.names = c("setosa", "versicolor", "virginica"))
+result
+
+```
+
+
+De seguida, ajustemos um modelo de $k$-vizinhos mais próximos, com $k = 3$, e avaliemos o seu desempenho:
+(...)
+
+
+```{r}
+
+obs <- iris.treino$class
+pred <- knn(iris.treino[, c("sepal.width", "petal.length")], iris.treino[, c("sepal.width", "petal.length")], as.factor(iris.treino$class), k = 3)
+
+table(obs, pred)
+
+```
+
+
+Poderíamos ter efetuado uma otimização no hiperparâmetro $k$, se assim o desejássemos, mas os resultados parecem ser já bastante interessantes.
+
+Passemos às árvores de decisão:
+
+
+```{r}
+
+arv.dec <- rpart(class ~ sepal.width + petal.length, data = iris.treino)
+print(arv.dec)
+
+```
+
+
+```{r}
+
+obs <- iris.treino$class
+pred <- predict(arv.dec, iris.treino, type = "class")
+
+table(obs, pred)
+
+```
+
+
+Mais uma vez, resultados promissores. E no modelo *naive Bayes*?
+
+
+```{r}
+
+mod.nb <- naiveBayes(class ~ sepal.width + petal.length, data = iris.treino)
+
+```
+
+
+```{r}
+
+obs <- iris.treino$class
+pred <- predict(mod.nb, iris.treino)
+
+table(obs, pred)
+
+```
+
+
+Também! Por último, recorrendo às *support vector machines*,
+
+
+```{r}
+
+mod.svm <- svm(iris.treino[, 2:3], as.factor(iris.treino$class))
+
+```
+
+
+```{r}
+
+obs <- iris.treino$class
+pred <- predict(mod.svm, iris.treino[, 2:3], probability = FALSE)
+
+table(obs, pred)
+
+```
+
+
+
+# Comparação de modelos no conjunto de validação
+
+
+
+Ajustados estes modelos, comparemos os seus desempenhos no conjunto de validação, para depois escolher o melhor modelo, o qual será colocado à prova no conjunto de teste.
+
+
+Para a **regressão logística**, teremos:
+
+
+```{r}
+
+obs <- iris.val$class
+pred <- predict(reg.log, iris.val)
+
+table(obs, pred)
+
+```
+
+
+Para os $k$-**vizinhos mais próximos**, teremos:
+
+
+```{r}
+
+obs <- iris.val$class
+pred <- knn(iris.treino[, c("sepal.width", "petal.length")], iris.val[, c("sepal.width", "petal.length")], as.factor(iris.treino$class), k = 3)
+
+table(obs, pred)
+
+```
+
+
+Para a **árvore de decisão**, teremos:
+
+
+```{r}
+
+obs <- iris.val$class
+pred <- predict(arv.dec, iris.val, type = "class")
+
+table(obs, pred)
+
+```
+
+
+Para o modelo **naive Bayes**, teremos:
+
+
+```{r}
+
+obs <- iris.val$class
+pred <- predict(mod.nb, iris.val)
+
+table(obs, pred)
+
+```
+
+
+Para as **máquinas vetoriais de suporte**, teremos:
+
+
+```{r}
+
+obs <- iris.val$class
+pred <- predict(mod.svm, iris.val[, 2:3], probability = FALSE)
+
+table(obs, pred)
+
+```
+
+
+Os desempenhos observados são bastante similares - talvez, quanto muito, à exceção das SVM's. Como tal, cabe-nos a nós escolher a nossa abordagem preferida e, **tendo em conta a sua interpretabilidade, iremos optar pelas árvores de decisão**.
+
+Por curiosidade, todos os modelos parecem ser quase perfeitos, à exceção de uma ou duas previsões menos certas. A principal culpada é a observação número `12`:
+
+
+```{r}
+
+which(iris.val$class != predict(reg.log, iris.val))
+
+which(iris.val$class != knn(iris.treino[, c("sepal.width", "petal.length")], iris.val[, c("sepal.width", "petal.length")], as.factor(iris.treino$class), k = 3))
+
+which(iris.val$class != predict(arv.dec, iris.val, type = "class"))
+
+which(iris.val$class != predict(mod.nb, iris.val))
+
+which(iris.val$class != predict(mod.svm, iris.val[, 2:3], probability = FALSE))
+
+```
+
+
+mas qual é esta observação?
+
+
+```{r}
+
+iris.val[12, c("sepal.width", "petal.length", "class")]
+
+```
+
+
+
+# Avaliação final, no conjunto de teste
+
+
+
+Construída a árvore de decisão, avaliemos a sua performance no conjunto de teste, o qual visa simular da forma mais fiel possível *previously unseen data*:
+
+
+```{r}
+
+obs <- iris.teste$class
+pred <- predict(arv.dec, iris.teste, type = "class")
+
+conf.mat <- table(obs, pred)
+
+accuracy.teste <- sum(diag(conf.mat))/sum(conf.mat)
+
+```
+
+
+O resultado não poderia ser melhor (neste subconjunto)!
+
+
+
+# Interpretação do modelo escolhido
+
+
+
+Mais uma vez, teremos:
+
+
+```{r}
+
+print(arv.dec)
+
+```
+
+
+Este modelo é ainda mais simples do que pensávamos! Basicamente, este utiliza apenas uma *feature* e diz-nos o seguinte:
+
+1. Se o comprimento das pétalas for inferior a $2.65$ $cm$, estaremos perante uma flor da espécie `setosa`;
+2. Se o comprimento das pétalas pertencer ao intervalo $[2.65 cm, 4.75 cm[$, estaremos perante uma flor da espécie `versicolor`;
+3. Se o comprimento das pétalas igualar ou exceder $4.75$ $cm$, estaremos perante uma flor da espécie `virginica`.
+
+No entanto, esta pode não ser a visualização mais apelativa. Nesse sentido, executemos:
+
+
+```{r}
+
+rpart.plot(arv.dec)
+
+```
+
+
+Por último, visualizemos as previsões geradas pelo modelo no conjunto de teste (as quais, ao serem totalmente precisas, refletem também as classes reais):
+
+
+```{r}
+
+plot(iris.teste$petal.length, iris.teste$sepal.width, col = predict(arv.dec, iris.teste, type = "class"), pch = 19)
+
+```
+
+
+
+# Exportação do modelo escolhido
+
+
+
+Por último, e concluída esta etapa, exportemos o modelo obtido, bem como os seus resultados, para poder realizar previsões futuras com base no mesmo:
+
+
+```{r}
+
+save(arv.dec, file = "./resultados/modelos/arvore_decisao.RData")
+save(accuracy.teste, file = "./resultados/modelos/accuracy_teste.RData")
+
+```
+
+
+
+<!-- Melhorar último gráfico!--->
+<!-- Exportar modelo escolhido!--->
+<!-- Lidar com o here()--->

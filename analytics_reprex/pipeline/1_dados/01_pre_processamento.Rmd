@@ -1,0 +1,329 @@
+---
+title: "Pré-processamento de dados"
+author: "Victor Abreu"
+date: "08/12/2022"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE, cache = FALSE}
+
+library("knitr") # necessário carregar este pacote
+# install.packages("here")
+library("here") # necessário carregar este pacote
+# here()
+
+knitr::opts_chunk$set(echo = TRUE) # apresentar trechos de código no relatório final: sim ou não?
+opts_knit$set(root.dir = here()) # define como working directory o diretório do projeto (pois este ficheiro .Rmd está em "./pipeline/1_dados")
+opts_chunk$set(root.dir = here()) # define como working directory o diretório do projeto (pois este ficheiro .Rmd está em "./pipeline/1_dados")
+
+```
+
+
+
+# Introdução
+
+
+> Esta análise foi realizada no âmbito de ...
+
+
+Primeiro, comecemos por verificar se estamos a iniciar o nosso trabalho no diretório correcto:
+
+
+```{r}
+
+getwd()
+
+```
+
+
+Este aspeto é crucial, até para garantir a correta reproducibilidade deste nosso projeto.
+
+Importemos ainda o nosso *script* orientado para o **pré-processamento** de dados:
+
+
+```{r}
+
+source("./misc/scripts/dpp.R", encoding = 'UTF-8')
+
+```
+
+
+
+# Importação de dados
+
+
+Efetuemos a importação dos dados originais, através do comando `read.csv`...
+
+
+```{r}
+
+iris.1 <- read.csv("./pipeline/1_dados/iris_1.csv")
+iris.2 <- read.csv("./pipeline/1_dados/iris_2.csv")
+
+```
+
+
+... e confirmemos esta importação, através de:
+
+
+```{r}
+
+head(iris.1, n = 10)
+dim(iris.1)
+str(iris.1)
+
+```
+
+
+```{r}
+
+head(iris.2, n = 10)
+dim(iris.2)
+str(iris.2)
+
+```
+
+
+
+# Limpeza de dados
+
+
+
+Existirão valores em falta, em qualquer dos `data.frames`? A verdade é que sim, pois:
+
+
+```{r}
+
+for (i in 1:ncol(iris.1)) {
+  
+  print(paste0("N.º de observações em falta na variável ", colnames(iris.1)[i], ": ", dpp.data.anomalies(iris.1[, i], freqs = "abs")))
+  
+}
+
+```
+
+
+```{r}
+
+which(is.na(iris.1[, 2]))
+
+```
+
+
+```{r}
+
+iris.1[19, ]
+
+```
+
+
+```{r}
+
+# "Disguised missing value" - apesar de existente, este dado está na verdade em falta, uma vez que não faz nenhum sentido o dado que nele foi preenchido e armazenado
+
+iris.2[66, ]
+
+```
+
+
+Teremos, de alguma forma, de imputar estes valores em falta. Podemos recorrer à informação presente na coluna remanescente para, através de uma regressão linear simples, obtenhamos valores válidos para estas linhas:
+
+
+```{r}
+
+tmp.1 <- lm(Sepal.Length ~ Sepal.Width, data = iris.1)
+# summary(tmp.1)
+iris.1[19, "Sepal.Length"] <- predict(tmp.1, iris.1[19, ])
+rm(tmp.1)
+
+```
+
+
+```{r}
+
+# Nota: a imputação do valor tecnicamente em falta não pode ser influenciada pelo valor atualmente armazenado!
+
+tmp.2 <- lm(Petal.Length ~ Petal.Width, data = iris.2[setdiff(1:nrow(iris.2), 66), ])
+# summary(tmp.2)
+iris.2[66, "Petal.Length"] <- predict(tmp.2, iris.2[66, ])
+rm(tmp.2)
+
+```
+
+
+Vejamos se o problema ficou resolvido:
+
+
+```{r}
+
+iris.1[19, ]
+
+```
+
+
+```{r}
+
+iris.2[66, ]
+
+```
+
+
+Parece que sim. Nesse caso, passemos à fase seguinte.
+
+
+
+# Integração de dados
+
+
+
+Os dois `data.frames` aqui importados ser-nos-iam muito mais úteis se se fundissem num único conjunto de dados. Façamos, portanto, a junção que se impõe.
+
+Tanto `iris.1` como `iris.2` possuem uma coluna de caráter identificatório que se presta para eventuais `JOIN`'s, o que justifica o recurso aos seguintes comandos:
+
+
+```{r}
+
+iris <- merge(iris.1, iris.2, by = "ID")
+
+```
+
+
+```{r}
+
+iris <- subset(iris, select = -c(Species.x, ID))
+
+```
+
+
+```{r}
+
+names(iris) <- tolower(names(iris))
+names(iris)[5] <- "species"
+# head(iris)
+
+```
+
+
+
+# Redução de dados
+
+
+
+Poderão existir registos duplicados, neste nosso conjunto de dados? A resposta é afirmativa e, nesse caso, executemos:
+
+
+```{r}
+
+anyDuplicated(iris)
+# duplicated(iris)
+
+```
+
+
+```{r}
+
+iris <- iris[!duplicated(iris), ]
+
+```
+
+
+Confirmemos se continua a ser esse o caso:
+
+
+```{r}
+
+anyDuplicated(iris)
+
+```
+
+
+
+# Transformação de dados
+
+
+Como a natureza deste projeto será, muito provavelmente, a de um problema de classificação, talvez seja boa ideia normalizar o valor das potenciais *features* em estudo, isto apesar de partilharem uma natureza comum (medições):
+
+
+```{r}
+
+iris$sepal.length.norm <- (iris$sepal.length - min(iris$sepal.length))/(max(iris$sepal.length) - min(iris$sepal.length))
+iris$sepal.width.norm <- (iris$sepal.width - min(iris$sepal.width))/(max(iris$sepal.width) - min(iris$sepal.width))
+iris$petal.length.norm <- (iris$petal.length - min(iris$petal.length))/(max(iris$petal.length) - min(iris$petal.length))
+iris$petal.width.norm <- (iris$petal.width - min(iris$petal.width))/(max(iris$petal.width) - min(iris$petal.width))
+
+```
+
+
+```{r}
+
+iris$class <- iris$species
+iris <- iris[, -c(5)]
+
+```
+
+
+
+# Separação do conjunto de dados em subconjuntos de treino, validação e teste
+
+
+
+Como seria de esperar, quaisquer modelos que possamos vir a construir no futuro sê-lo-ão apenas no subconjunto formado pelas observações de teste - isto pois o nosso objetivo é o de reduzir um conjunto de dados mais vasto a um modelo composto por, no máximo, apenas 4 variáveis preditivas, devendo este modelo ter a capacidade de generalização, e sobretudo de previsão em *previously unseen data*.
+
+Como tal, coloca-se a necessidade de um particionamento *treino-validação-teste* do nosso conjunto de dados atual, devendo as observações ser atribuídas a um (e apenas um) destes subconjuntos de forma puramente aleatória. Assim sendo, teremos:
+
+
+```{r}
+
+n <- nrow(iris)
+
+perc.obs.treino <- 0.56
+perc.obs.val <- 0.24
+perc.obs.teste <- 0.2
+
+indices <- sample(1:n, n)
+
+n.treino <- round(perc.obs.treino * n, 0)
+n.val <- round(perc.obs.val * n, 0)
+n.teste <- n - n.treino - n.val
+  
+```
+
+
+```{r}
+
+iris.treino <- iris[1:n.treino, ]
+iris.val <- iris[(n.treino + 1):(n.treino + n.val), ]
+iris.teste <- iris[(n.treino + n.val + 1):n, ]
+  
+```
+
+
+
+# Exportação de dados
+
+
+
+Por último, e concluído o pré-processamento de dados, armazenemos as observações no conjunto de dados global em vários ficheiros, dependendo do subconjunto a que estas pertencem (treino, validação ou teste), tendo em mente tanto a exploração destes dados como a sua modelação futura.
+
+**Nota**: Para fase seguinte (análise exploratória de dados), apenas iremos conservar para estudo futuro o conjunto de treino - para evitar ocorrências de ***data leakage***.
+
+
+```{r}
+
+write.csv(iris.treino, file = "pipeline/2_aed/iris_treino.csv", row.names = FALSE)
+
+```
+
+
+```{r}
+
+write.csv(iris.treino, file = "pipeline/3_modelos/iris_treino.csv", row.names = FALSE)
+write.csv(iris.val, file = "pipeline/3_modelos/iris_val.csv", row.names = FALSE)
+write.csv(iris.teste, file = "pipeline/3_modelos/iris_teste.csv", row.names = FALSE)
+
+```
+
+
+<!-- COMENTÁRIOS--->

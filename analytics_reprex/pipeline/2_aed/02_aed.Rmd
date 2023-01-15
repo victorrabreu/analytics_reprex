@@ -1,0 +1,285 @@
+---
+title: "Análise exploratória de dados"
+author: "Victor Abreu"
+date: "08/12/2022"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE, cache = FALSE}
+
+library("knitr") # necessário carregar este pacote
+# install.packages("here")
+library("here") # necessário carregar este pacote
+# here()
+
+knitr::opts_chunk$set(echo = TRUE) # apresentar trechos de código no relatório final: sim ou não?
+opts_knit$set(root.dir = here()) # define como working directory o diretório do projeto (pois este ficheiro .Rmd está em "./pipeline/2_aed")
+opts_chunk$set(root.dir = here()) # define como working directory o diretório do projeto (pois este ficheiro .Rmd está em "./pipeline/2_aed")
+
+```
+
+
+# Introdução
+
+
+> Esta análise foi realizada no âmbito de ...
+
+
+Primeiro, comecemos por verificar se estamos a iniciar o nosso trabalho no diretório correcto:
+
+
+```{r}
+
+getwd()
+
+```
+
+
+Este aspeto é crucial, até para garantir a correta reproducibilidade deste nosso projeto.
+
+Importemos ainda o nosso *script* orientado para a **exploração** de dados:
+
+
+```{r}
+
+source("./misc/scripts/eda.R", encoding = 'UTF-8')
+
+```
+
+
+
+# Importação de dados
+
+
+Efetuemos a importação dos dados exportados na fase anterior, através do comando `read.csv`, com posterior confirmação (e ajustando a natureza dos dados em cada coluna):
+
+
+```{r}
+
+iris.treino <- read.csv2("./pipeline/2_aed/iris_treino.csv", sep = ",")
+
+```
+
+
+```{r}
+
+iris.treino$sepal.length <- as.numeric(iris.treino$sepal.length)
+iris.treino$sepal.width <- as.numeric(iris.treino$sepal.width)
+iris.treino$petal.length <- as.numeric(iris.treino$petal.length)
+iris.treino$petal.width <- as.numeric(iris.treino$petal.width)
+
+iris.treino$sepal.length.norm <- as.numeric(iris.treino$sepal.length.norm)
+iris.treino$sepal.width.norm <- as.numeric(iris.treino$sepal.width.norm)
+iris.treino$petal.length.norm <- as.numeric(iris.treino$petal.length.norm)
+iris.treino$petal.width.norm <- as.numeric(iris.treino$petal.width.norm)
+
+```
+
+
+```{r}
+
+head(iris.treino, n = 10)
+dim(iris.treino)
+str(iris.treino)
+
+```
+
+
+# Análises univariadas
+
+
+No campo da exploração propriamente dito, comecemos por estudar o comportamento de cada uma das variáveis do nosso (potencial) interesse, ainda antes de verificarmos se existem (ou não) possíveis relações de interesse entre as mesmas.
+
+
+```{r}
+
+eda.rmd.table.display(eda.univariate.numeric.stats(iris.treino$sepal.length, desc = "Comprimento das sépalas (em cm)", na.rm = TRUE, digits = 3), mode = "HTML")
+
+```
+
+
+```{r fig.height = 6, fig.width = 9}
+
+eda.univariate.numeric.plots(iris.treino$sepal.length, main = "Comprimento das sépalas das flores em estudo", sub = "", xlab = "Comprimento (em cm)", ylab = "Densidades estimadas", xlim = c(4, 8), ylim = c(0, 0.5), bars.col = blue.palette.dark[5], line.col = color.palette[1], lwd = 2, breaks = 10)
+
+```
+
+
+De notar que:
+
+1. De uma forma geral, o comprimento das sépalas se encontra entre os 5.1 e os 6.3 centímetros, sendo que o cenário mais comum é aquele onde estas medem cerca de 5.7 $cm$;
+2. Tenhamos também em mente, para evitar possíveis erros de extrapolação na construção de futuros modelos, que todas as medições pertencem ao intervalo $[4.3 cm; 7.7cm]$;
+3. Não há muita dispersão nestas medições;
+4. A dispersão que de facto existe não tem uma tendência definida nem se acumula numa cauda (isto é, a distribuição parece ser razoavelmente simétrica), nem é causada por valores extremos (dado que a curtose não assume valores elevados).
+
+
+```{r}
+
+eda.rmd.table.display(eda.univariate.numeric.stats(iris.treino$sepal.width, desc = "Largura das sépalas (em cm)", na.rm = TRUE, digits = 3), mode = "HTML")
+
+```
+
+
+```{r fig.height = 6, fig.width = 9}
+
+eda.univariate.numeric.plots(iris.treino$sepal.width, main = "Largura das sépalas das flores em estudo", sub = "", xlab = "Larguras (em cm)", ylab = "Densidades estimadas", xlim = c(2, 4.5), ylim = c(0, 1.2), bars.col = green.palette[6], line.col = color.palette[1], lwd = 2, breaks = 8)
+
+```
+
+
+De notar que:
+
+1. De uma forma geral, a largura das sépalas se encontra entre os 2.8 e os 3.3 centímetros, sendo que o cenário mais comum é aquele onde estas medem cerca de 3 $cm$;
+2. Tenhamos também em mente, para evitar possíveis erros de extrapolação na construção de futuros modelos, que todas as medições pertencem ao intervalo $[2.2 cm; 4.4cm]$;
+3. Não há muita dispersão nestas medições;
+4. A dispersão que de facto existe não tem uma tendência definida nem se acumula numa cauda (isto é, a distribuição parece ser razoavelmente simétrica), nem é causada por valores extremos (dado que a curtose não assume valores elevados).
+
+De destacar ainda a existência de uma "ilha" composta por duas observações onde ´sepal.width == 4.4´.
+
+
+```{r}
+
+eda.rmd.table.display(eda.univariate.numeric.stats(iris.treino$petal.length, desc = "Comprimento das pétalas (em cm)", na.rm = TRUE, digits = 3), mode = "HTML")
+
+```
+
+
+```{r fig.height = 6, fig.width = 9}
+
+eda.univariate.numeric.plots(iris.treino$petal.length, main = "Comprimento das pétalas das flores em estudo", sub = "", xlab = "Comprimentos (em cm)", ylab = "Densidades estimadas", xlim = c(1, 7), ylim = c(0, 0.5), bars.col = pink.palette[7], line.col = color.palette[1], lwd = 2, breaks = 8)
+
+```
+
+
+De notar que:
+
+1. De uma forma geral, o comprimento das pétalas se encontra entre os 1.6 e os 5 centímetros e, mais concretamente, estas tendem a medir entre 3.7 a 4.3 $cm$;
+2. Apesar disto, o mais comum é encontrarmos pétalas curtas, de $1.4 cm$, sendo que na verdade existem três tipos de pétalas: curtas (entre 1 e 2 cm), médias (entre 3.5 a 6 cm), e longas (6.5 a 7 cm);
+3. Tenhamos também em mente, para evitar possíveis erros de extrapolação na construção de futuros modelos, que todas as medições pertencem ao intervalo $[1.1 cm; 6.7cm]$;
+4. Agora existe uma maior dispersão nos dados;
+5. A dispersão existente não tem, mais uma vez, uma tendência definida nem se acumula numa cauda (isto é, a distribuição parece ser razoavelmente simétrica), nem é causada por valores extremos (dado que a curtose não assume valores elevados).
+
+
+```{r}
+
+eda.rmd.table.display(eda.univariate.numeric.stats(iris.treino$petal.width, desc = "Largura das pétalas (em cm)", na.rm = TRUE, digits = 3), mode = "HTML")
+
+```
+
+
+```{r fig.height = 6, fig.width = 9}
+
+eda.univariate.numeric.plots(iris.treino$petal.width, main = "Largura das pétalas das flores em estudo", sub = "", xlab = "Larguras (em cm)", ylab = "Densidades estimadas", xlim = c(0, 2.6), ylim = c(0, 1.1), bars.col = orange.palette[6], line.col = color.palette[1], lwd = 2, breaks = 10)
+
+```
+
+
+                     Largura das pétalas (em cm)
+mean                                       1.163
+median                                     1.300
+first.quartile                             0.375
+third.quartile                             1.725
+inter.quartile.range                       1.350
+
+
+De notar que:
+
+1. De uma forma geral, a largura das pétalas se encontra entre os 0.4 e os 1.8 centímetros e, mais concretamente, estas tendem a medir entre 1.1 a 1.3 $cm$;
+2. Apesar disto, o mais comum é encontrarmos pétalas menos largas (até 0.6 cm, sobretudo perto de 0.2 cm) ou mais largas (a partir de 0.8 cm);
+3. Tenhamos também em mente, para evitar possíveis erros de extrapolação na construção de futuros modelos, que todas as medições pertencem ao intervalo $[0.1 cm; 2.5cm]$;
+4. Agora existe uma maior dispersão nos dados;
+5. A dispersão existente não tem, mais uma vez, uma tendência definida nem se acumula numa cauda (isto é, a distribuição parece ser razoavelmente simétrica), nem é causada por valores extremos (dado que a curtose não assume valores elevados).
+
+
+
+# Análises multivariadas
+
+
+
+Uma vez dissecado o nosso conjunto de dados numa análise univariada, podemos passar para análises multivariadas, sobretudo bivariadas.
+
+Sendo o nosso interesse o de prever `species`, devemos ter cuidado com uma potencial colinearidade das features que nos irão auxiliar nessa tarefa. Nesse sentido, eis a seguinte matriz de correlações (de Pearson):
+
+
+```{r}
+
+cor(iris.treino[, 1:4])
+
+```
+
+
+Podemos notar desde já que suspeitamos que `sepal.length`, `petal.length` e `petal.width` são variáveis que se irão comportar de forma similar, por contraste com `sepal.width`, mais independente. De facto,
+
+
+```{r fig.height = 6, fig.width = 9}
+
+eda.conditional.numeric.groupby.plots(iris.treino$sepal.length, iris.treino$class, k = 1.5, main = "Comprimento das sépalas por espécie", xlab = "Espécie de flor", ylab = "Comprimentos (em cm)", box.col = color.palette[c(1, 4, 9)])
+
+```
+
+
+```{r fig.height = 6, fig.width = 9}
+
+eda.conditional.numeric.groupby.plots(iris.treino$petal.length, iris.treino$class, k = 1.5, main = "Comprimento das pétalas por espécie", xlab = "Espécie de flor", ylab = "Comprimentos (em cm)", ylim = NULL, box.col = color.palette[c(1, 4, 9)])
+
+```
+
+
+```{r fig.height = 6, fig.width = 9}
+
+eda.conditional.numeric.groupby.plots(iris.treino$petal.width, iris.treino$class, k = 1.5, main = "Largura das pétalas por espécie", xlab = "Espécie de flor", ylab = "Larguras (em cm)", ylim = NULL, box.col = color.palette[c(1, 4, 9)])
+
+```
+
+De notar, de forma geral, que sendo o objetivo destas visualizações o de permitir comparações, não constitui problema o facto do eixo vertical não ter início no 0.
+
+Dada a similaridade entre estas variáveis explicativas, as relações entre cada uma delas e a espécie da planta serão também similares; em todas elas notamos que a espécie `setosa` está associada a menores medições, e que `virginica` pode ser caraterizada por maiores medições, estando `versicolor` algures no meio.
+
+Por isso, e sem perda de generalidade, escolhamos apenas `petal.length`:
+
+
+```{r}
+
+eda.conditional.numeric.groupby.stats(iris.treino$petal.length, iris.treino$class)
+
+```
+
+
+Por contraste, ter-se-á:
+
+
+```{r}
+
+eda.conditional.numeric.groupby.stats(iris.treino$sepal.width, iris.treino$class)
+
+```
+
+
+```{r fig.height = 6, fig.width = 9}
+
+eda.conditional.numeric.groupby.plots(iris.treino$sepal.width, iris.treino$class, k = 1.5, main = "Largura das sépalas por espécie", xlab = "Espécie de flor", ylab = "Larguras (em cm)", ylim = NULL, box.col = color.palette[c(1, 4, 9)])
+
+```
+
+
+Observamos, tanto de forma visual como de forma numérica, que:
+
+1. As plantas da espécie `setosa` têm sépalas mais largas, em adição ao que já vimos anteriormente (pétalas menos compridas, isto é, mais curtas);
+2. De seguida, embora já a alguma distância, são as plantas da espécie `virginica` as que apresentam as sépalas mais extensas;
+3. Por último, e também por exclusão de partes, são as plantas da espécie `versicolor` as que apresentam menores sépalas (salvo raras excepções).
+
+Em ambas as análises, os graus de dispersão relativa das medições são similares entre espécies.
+
+
+
+# Impressões finais
+
+
+
+Uma breve análise à matriz de correlações apresentada sugere que provavelmente será boa ideia utilizar apenas duas *features*: `sepal.width` e mais uma de entre as outras 3. Tendo em conta a natureza das medições, bem como a dispersão das mesmas, talvez seja interessante escolher como segundo preditor `petal.length`.
+
+
+<!-- INSERIR CONSTANTES NO TOPO, se necessário!--->
+<!-- COMENTÁRIOS--->
